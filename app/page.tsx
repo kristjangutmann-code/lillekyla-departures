@@ -1,6 +1,23 @@
-
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// Kui tahad keskkonnamuutujast juhtida, lisa Vercelis NEXT_PUBLIC_TZ_LABEL
+const TZ = (process.env.NEXT_PUBLIC_TZ_LABEL as string) || "Europe/Tallinn";
+
+type Trip = {
+  origin_departure_time: string; // "HH:MM:SS"
+  destination_arrival_time: string; // "HH:MM:SS"
+  route_name?: string;
+  route_onestop_id?: string;
+  headsig?: string;
+};
 
 const ROUTES = [
   { label: "Lilleküla → Klooga", from: "LILLEKYLA", to: "s-ud932p00sp-kloogaraudteejaam" },
@@ -8,14 +25,6 @@ const ROUTES = [
   { label: "Klooga → Lilleküla", from: "s-ud932p00sp-kloogaraudteejaam", to: "LILLEKYLA" },
   { label: "Kloogaranna → Lilleküla", from: "s-ud91xepqe7-kloogaranna", to: "LILLEKYLA" },
 ];
-
-type Trip = {
-  origin_departure_time: string; // HH:MM:SS
-  destination_arrival_time: string; // HH:MM:SS
-  route_name?: string;
-  route_onestop_id?: string;
-  headsig?: string;
-};
 
 export default function Page() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -28,14 +37,16 @@ export default function Page() {
   const fetchTrips = async () => {
     setLoading(true);
     setError(null);
-    setItems(null);
     try {
-      const res = await fetch(`/api/departures?from=${encodeURIComponent(active.from)}&to=${encodeURIComponent(active.to)}`);
+      const res = await fetch(
+        `/api/departures?from=${encodeURIComponent(active.from)}&to=${encodeURIComponent(active.to)}`
+      );
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setItems(data.trips as Trip[]);
     } catch (e: any) {
       setError(e?.message || "Tundmatu viga");
+      setItems(null);
     } finally {
       setLoading(false);
     }
@@ -43,59 +54,109 @@ export default function Page() {
 
   useEffect(() => {
     fetchTrips();
-    const id = setInterval(fetchTrips, 60_000); // refresh every minute
+    const id = setInterval(fetchTrips, 60_000); // värskenda iga minut
     return () => clearInterval(id);
   }, [activeIndex]);
 
-  const nowLabel = useMemo(() => new Date().toLocaleString("et-EE", { hour: "2-digit", minute: "2-digit" }), []);
+  const now = dayjs().tz(TZ);
+  const nowLabel = now.format("HH:mm");
 
   return (
-    <main className="mx-auto max-w-3xl p-4">
-      <h1 className="text-2xl font-semibold mb-1">Lilleküla ↔ Klooga/Kloogaranna</h1>
-      <p className="text-sm opacity-80 mb-4">Kuvab täna järelejäänud väljumised. Viimane värskendus: {nowLabel}.</p>
+    <main style={{ maxWidth: 800, margin: "0 auto", padding: 16 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>
+        Lilleküla ↔ Klooga / Kloogaranna
+      </h1>
+      <p style={{ opacity: 0.75, marginBottom: 16 }}>
+        Kuvab <strong>täna</strong> järelejäänud väljumised. Viimane värskendus: {nowLabel} ({TZ}).
+      </p>
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {ROUTES.map((r, i) => (
           <button
             key={i}
             onClick={() => setActiveIndex(i)}
-            className={`px-3 py-2 rounded-2xl text-sm border ${i === activeIndex ? "bg-black text-white" : "bg-white"}`}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 16,
+              border: "1px solid #ddd",
+              background: i === activeIndex ? "#111" : "#fff",
+              color: i === activeIndex ? "#fff" : "#111",
+              cursor: "pointer",
+            }}
           >
             {r.label}
           </button>
         ))}
       </div>
 
-      {loading && <div className="p-4 border rounded-xl bg-white">Laen väljumisi…</div>}
+      {loading && (
+        <div style={{ padding: 16, border: "1px solid #eee", borderRadius: 12, background: "#fff" }}>
+          Laen väljumisi…
+        </div>
+      )}
+
       {error && (
-        <div className="p-4 border rounded-xl bg-white text-red-700">
+        <div
+          style={{
+            padding: 16,
+            border: "1px solid #f3c2c2",
+            borderRadius: 12,
+            background: "#fff6f6",
+            color: "#a40000",
+          }}
+        >
           Viga: {error}
-          <div className="text-xs opacity-70 mt-1">Kontrolli .env API võtit ja kas peatus “Lilleküla” tuvastus õnnestus.</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+            Kontrolli, et Vercelis on <code>TRANSITLAND_API_KEY</code> ja kaustastruktuur on korrektne.
+          </div>
         </div>
       )}
 
       {items && (
-        <div className="grid gap-2">
+        <div style={{ display: "grid", gap: 8 }}>
           {items.length === 0 && (
-            <div className="p-4 border rounded-xl bg-white">Täna rohkem väljumisi pole.</div>
+            <div style={{ padding: 16, border: "1px solid #eee", borderRadius: 12, background: "#fff" }}>
+              Täna rohkem väljumisi pole.
+            </div>
           )}
+
           {items.map((t, idx) => (
-            <div key={idx} className="flex items-center justify-between p-4 border rounded-xl bg-white">
+            <div
+              key={idx}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: 16,
+                border: "1px solid #eee",
+                borderRadius: 12,
+                background: "#fff",
+              }}
+            >
               <div>
-                <div className="text-lg font-medium">Väljub {t.origin_departure_time.slice(0,5)}</div>
-                <div className="text-sm opacity-70">Saabub {t.destination_arrival_time.slice(0,5)}</div>
+                <div style={{ fontSize: 18, fontWeight: 600 }}>
+                  Väljub {t.origin_departure_time.slice(0, 5)}
+                </div>
+                <div style={{ fontSize: 14, opacity: 0.7 }}>
+                  Saabub {t.destination_arrival_time.slice(0, 5)}
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-sm">{t.route_name || t.route_onestop_id}</div>
-                {t.headsig && <div className="text-xs opacity-60">{t.headsig}</div>}
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 14 }}>
+                  {t.route_name || t.route_onestop_id}
+                </div>
+                {t.headsig && (
+                  <div style={{ fontSize: 12, opacity: 0.6 }}>{t.headsig}</div>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <footer className="mt-8 text-xs opacity-60">
-        Andmeallikas: Transitland (GTFS). Arvestab nädalavahetusi ja pühi GTFS kalendri põhjal.
+      <footer style={{ marginTop: 24, fontSize: 12, opacity: 0.6 }}>
+        Andmeallikas: Transitland (GTFS). Päring arvestab kalendreid (nädalavahetused/pühad) ja kuvab ainult
+        tänasest kellaajast edasi.
       </footer>
     </main>
   );
