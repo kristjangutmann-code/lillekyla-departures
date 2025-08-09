@@ -7,14 +7,9 @@
     "start": "next start -p 3000"
   },
   "dependencies": {
-  "dayjs": "^1.11.11",
-  "next": "^14.2.6",
-  "react": "^18.3.1",
-  "react-dom": "^18.3.1"
-    import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
+    "dayjs": "^1.11.11",
+    "next": "^14.2.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
 }
