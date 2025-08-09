@@ -1,4 +1,4 @@
-// File: README.md
+
 # Lilleküla ↔ Klooga/Kloogaranna — Vercel app
 
 Näitab **täna järelejäänud** Elroni väljumisi suundadel:
