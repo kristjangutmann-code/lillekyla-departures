@@ -1,4 +1,4 @@
-// File: app/layout.tsx
+
 export const metadata = {
   title: "Lilleküla ↔ Klooga/Kloogaranna departures",
   description: "Shows today's remaining trains for Elron (R11/R12/R14/R15) westbound branch.",
