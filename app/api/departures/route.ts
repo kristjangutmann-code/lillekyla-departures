@@ -1,4 +1,3 @@
-
 import { NextRequest } from "next/server";
 
 const TL_BASE_V1 = "https://transit.land/api/v1"; // schedule_stop_pairs
@@ -6,33 +5,16 @@ const TL_BASE_V2 = "https://transit.land/api/v2/rest"; // stops search
 
 // Known Onestop IDs
 const KLOOGARANNA = "s-ud91xepqe7-kloogaranna";
-const KLOOGA = "s-ud932p00sp-kloogaraudteejaam";
+const KLOOGA = "s-ud932nbvg7-klooga"; // Updated Onestop ID for Klooga
+const TALLINN = "s-ud9d4uv075-tallinn"; // Updated Onestop ID for Tallinn
 
-// Resolve Lilleküla Onestop ID by coordinates, cache in memory in the serverless function runtime
-let cachedLillekyla: string | null = null;
-
-async function resolveLillekylaOnestopId(apiKey: string): Promise<string> {
-  if (cachedLillekyla) return cachedLillekyla;
-  // Lilleküla station coordinates from Wikipedia
-  const lat = 59.42484;
-  const lon = 24.72806;
-  const url = new URL(`${TL_BASE_V2}/stops`);
-  url.searchParams.set("lat", String(lat));
-  url.searchParams.set("lon", String(lon));
-  url.searchParams.set("radius", "800");
-  url.searchParams.set("apikey", apiKey);
-
-  const r = await fetch(url, { next: { revalidate: 3600 } });
-  if (!r.ok) throw new Error(`Transitland stops error: ${r.status}`);
-  const data = await r.json();
-  // Heuristic: prefer names containing "Lille" and rail-served if available
-  const stops = (data?.stops || []) as any[];
-  const candidate =
-    stops.find((s) => (s.name || "").toLowerCase().includes("lille")) || stops[0];
-  if (!candidate?.onestop_id) throw new Error("Lilleküla peatuse ID ei leitud");
-  cachedLillekyla = candidate.onestop_id as string;
-  return cachedLillekyla;
-}
+// Validate if from and to are part of the valid routes
+const validRoutes = [
+  { from: TALLINN, to: KLOOGA }, // Tallinn - Klooga
+  { from: TALLINN, to: KLOOGARANNA }, // Tallinn - Kloogaranna
+  { from: KLOOGARANNA, to: TALLINN }, // Kloogaranna - Tallinn
+  { from: KLOOGA, to: TALLINN }, // Klooga - Tallinn
+];
 
 function hhmmss(date: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -49,13 +31,21 @@ export async function GET(req: NextRequest) {
   const toRaw = req.nextUrl.searchParams.get("to");
   if (!fromRaw || !toRaw) return new Response("Missing from/to", { status: 400 });
 
+  // Check if the route is valid
+  const validRoute = validRoutes.find(
+    (route) => route.from === fromRaw && route.to === toRaw
+  );
+  if (!validRoute) {
+    return new Response("Invalid route", { status: 400 });
+  }
+
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
   const fromTime = hhmmss(now);
 
-  // Resolve LILLEKYLA placeholder to real onestop id
-  const from = fromRaw === "LILLEKYLA" ? await resolveLillekylaOnestopId(apiKey) : fromRaw;
-  const to = toRaw === "LILLEKYLA" ? await resolveLillekylaOnestopId(apiKey) : toRaw;
+  // Set the from and to to the valid Onestop IDs directly
+  const from = validRoute.from;
+  const to = validRoute.to;
 
   // v1 schedule_stop_pairs query — this respects calendars & exceptions (weekends, holidays)
   const url = new URL(`${TL_BASE_V1}/schedule_stop_pairs`);
