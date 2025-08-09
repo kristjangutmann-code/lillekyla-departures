@@ -1,4 +1,4 @@
-// File: app/api/departures/route.ts
+
 import { NextRequest } from "next/server";
 
 const TL_BASE_V1 = "https://transit.land/api/v1"; // schedule_stop_pairs
